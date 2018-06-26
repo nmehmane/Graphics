@@ -1,6 +1,8 @@
 #include "svg_parser.h"
+#include "ssdr.h"
 
 #include <iostream>
+#include <sstream>
 #include <Eigen/Core>
 #include "rapidxml_ns/rapidxml_ns.hpp"
 #include "rapidxml_ns/rapidxml_ns_utils.hpp"
@@ -81,45 +83,101 @@ void loadSvg(xml_element_t xml_root_element, Eigen::MatrixXd& rest_pose)
       processed_attributes<traits::shapes_attributes_by_element>
     >::load_document(xml_root_element, context);
     //  an N x 2 matrix
-    rest_pose = Eigen::MatrixXd::Zero(context.vertices.size() ,2);
+    rest_pose = Eigen::MatrixXd::Zero((context.vertices.size()/2) ,2);
 
     std::vector<double>::iterator it;
     int row = 0;
     for( it = context.vertices.begin(); it != context.vertices.end(); it++,row++  )
     {
         rest_pose(row,0) = *it;
-        printf(" x = %lf", rest_pose(row,0)); 
+        //printf(" x = %lf", rest_pose(row,0)); 
         rest_pose(row,1) = *(++it);
-        printf(" y = %lf\n", rest_pose(row,1)); 
+        //printf(" y = %lf\n", rest_pose(row,1)); 
     }
 }
 
 int main(int argc, char** argv)
 {
     // change args to ./exe <number of handles> <svg rest-pose> <number of frames> <svg pose 1> <svg pose2> ...
-    if( argc != 2 )
+    // Minimum requirements: 1)number of handels 2)rest pose 3)number of frames ( minimum 2 ) 4,5)minimum of two frames
+    if( argc < 5 )
     {
-        std::cout<<"/executable <svg file name>"<<std::endl;
+        std::cout<<"./exe <number of handles> <svg rest-pose> <number of frames> <svg pose 1> <svg pose2> ..."<<std::endl;
         return -1;
     }
+    
     //create ssdr element 
-    // fill num handles
-    // fill the rest pose
-    // fill the other poses
-    Eigen::MatrixXd rest_pose;
+    ssdr ssdr_elem;
+    
+    // set number of  handles
+    std::istringstream s(argv[1]);
+    if( !(s >> ssdr_elem.num_handles) )
+    {
+        std::cerr << "Invalid number of handles" << std::endl;
+    }
+
+    // Set the rest pose
     try
     {
-        rapidxml_ns::file<> xml_file(argv[1]);  
+        rapidxml_ns::file<> xml_file(argv[2]);  
         rapidxml_ns::xml_document<> doc;    // character type defaults to char
         doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
-        loadSvg(doc.first_node(), rest_pose);
+        loadSvg(doc.first_node(), ssdr_elem.rest_pose);
 
     }
     catch (std::exception const & e)
     {
-        std::cerr << "Error loading SVG: " << e.what() << std::endl;
+        std::cerr << "Error loading rest Pose SVG: " << e.what() << std::endl;
         return 1;
     }
+
+    // Set the other poses
+    // need a minimum of two other poses
+    std::istringstream ss( argv[3] );
+    int num_poses;
+    
+    if(!(ss >> num_poses))
+    {
+        std::cerr << " Invalid number of poses " << std::endl;
+        return 2;
+    }
+
+    if( num_poses < 2 )
+    {
+        std::cerr << " Need a minimum of two poses to Compute " << std::endl;
+        return 2;
+    }
+
+    try
+    {
+        for( int i = 0 ; i < num_poses ; i++ )
+        {
+            Eigen::MatrixXd new_pose;
+            rapidxml_ns::file<> xml_file(argv[4 + i]);  
+            rapidxml_ns::xml_document<> doc;    // character type defaults to char
+            doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
+            loadSvg(doc.first_node(), new_pose);
+            (ssdr_elem.frame_poses).push_back( new_pose );
+        }
+
+    }
+    catch (std::exception const & e)
+    {
+        std::cerr << "Error loading other SVG poses: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // testing
+    int i = 1;
+    for( auto elem : ssdr_elem.frame_poses )
+    {
+        // print the matrix
+        std::cout << "Pose\n" << elem << std::endl;
+    }
+     // print the rest pose matrix
+     std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
+
+
 
     return 0;
 }
