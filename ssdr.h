@@ -5,6 +5,7 @@
 #include <vector>
 
 #define SPARSENESS 4
+#define MAX_ITERATIONS 100
 
 class ssdr {
     
@@ -12,10 +13,13 @@ class ssdr {
     ssdr();
     ~ssdr();
     void init_bone_transforms(void);
+    //double avg_dis(int i, int j);
+    //void find_neighbors(int sj, int maxSelect, std::vector<int>& selected);
   //make all fields public
     Eigen::MatrixXd rest_pose;
     std::vector<Eigen::MatrixXd> frame_poses;
-    std::vector<Eigen::Matrix3d> handle_Transforms;
+    std::vector<Eigen::Vector2d> handle_translations;
+    std::vector<Eigen::Matrix2d> handle_rotations;
     Eigen::MatrixXd Weight;
     int num_handles;
 
