@@ -141,10 +141,15 @@ int main(int argc, char** argv)
         std::cerr << " Invalid number of poses " << std::endl;
         return 2;
     }
-
-    if( num_poses < 2 )
+    if( (argc - 4) != num_poses )
     {
-        std::cerr << " Need a minimum of two poses to Compute " << std::endl;
+        std::cerr << " number of poses does not match number of files " << std::endl;
+        return 2;
+    }
+
+    if( num_poses < 1 )
+    {
+        std::cerr << " Need a minimum of one deformed pose to Compute " << std::endl;
         return 2;
     }
 
@@ -172,10 +177,10 @@ int main(int argc, char** argv)
     for( auto elem : ssdr_elem.frame_poses )
     {
         // print the matrix
-        std::cout << "Pose\n" << elem << std::endl;
+//        std::cout << "Pose\n" << elem << std::endl;
     }
      // print the rest pose matrix
-     std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
+//     std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
 
     ssdr_elem.init_bone_transforms( );
 

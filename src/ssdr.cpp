@@ -61,7 +61,7 @@ void ssdr::init_bone_transforms(void)
         vertex_indices.push_back(i);
     }
     int dsds = vertex_indices.size();
-    printf( " meh = %d " , dsds );
+    //printf( " meh = %d " , dsds );
     // obtain a time-based seed:
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 
@@ -107,19 +107,20 @@ void ssdr::init_bone_transforms(void)
         }
     
         int row = 0;
+        clusters_copy.clear();
         //for each cluster
         for( auto &cluster : clusters )
         {
-            clusters_copy.clear();
 
-            for( auto &v : clusters )
+            std::vector<int> temp2;
+            for( auto p : cluster )
             {
-                std::vector<int> temp2;
-                for( auto &p : v )
-                {
-                    temp2.push_back(p);
-                }
-                clusters_copy.push_back( temp2 );
+                temp2.push_back(p);
+            }
+            clusters_copy.push_back( temp2 );
+            if(cluster.size() == 0 )
+            {
+                continue;
             }
             // get the rest pose and deformed coordinates
             Eigen::MatrixXd rest_positions = Eigen::MatrixXd::Zero( (int)cluster.size(), 2);
@@ -128,7 +129,7 @@ void ssdr::init_bone_transforms(void)
 
             Eigen::Vector2d p_bar(0, 0);
             Eigen::Vector2d q_bar(0, 0);
-
+            
             for( auto &index : cluster )
             {
                 rest_positions(row,0) = rest_pose(index,0);
@@ -147,8 +148,8 @@ void ssdr::init_bone_transforms(void)
 
                 row++;
             }
-            std::cout << " cluster rest positions matrix" << std::endl << rest_positions << std::endl; 
-            std::cout << " cluster deformed position matrix" << std::endl << deformed_positions << std::endl; 
+            //std::cout << " cluster rest positions matrix" << std::endl << rest_positions << std::endl; 
+            //std::cout << " cluster deformed position matrix" << std::endl << deformed_positions << std::endl; 
             
             p_bar/=(int)cluster.size();
             q_bar/=(int)cluster.size();
@@ -257,40 +258,45 @@ void ssdr::init_bone_transforms(void)
         }
         printf( " Finished iteration: %d\n", iter );
         iter++;
-
+        
+        bool terminate_loop = true;
         // check for termination : if the clustering hasn't changed since last iteration then terminate
         if( clusters.size() != clusters_copy.size() )
         { 
-            printf("No change in clusters! Terminating.\n" );
-            goto stop;
-            break;
+            terminate_loop = false;
         }
 
         for( int n = 0 ; n < num_handles ; n++ )
         {
             if( clusters[n].size() != clusters_copy[n].size() )
             {
-                printf("No change in clusters! Terminating.\n" );
-                goto stop;
-                break;
+                terminate_loop = false;
             }
             for( int m = 0 ; m < clusters[n].size(); m++ )
             {
                 if( clusters[n][m] != clusters_copy[n][m] )
                 {
-                    printf("No change in clusters! Terminating.\n" );
-                    goto stop;
-                    break;
+                    terminate_loop = false;
 
                 }
             }
+        }
+
+        if( terminate_loop == true )
+        {
+            printf("No change in clusters! Terminating.\n");
+            goto stop;
+        }
+        else
+        {
+            printf("START : ITERATION %d \n",iter );
         }
 
     }while(iter <= MAX_ITERATIONS);
     
     stop:
     printf( " rows = %d col = %d " , (int)clusters.size(), (int)clusters[0].size() );
-    printf(" the cluster is ----> \n" );
+    printf(" final clustering  ----> \n" );
     for( auto &v : clusters )
     {
         for( auto &p : v )
