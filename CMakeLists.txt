@@ -9,6 +9,12 @@ INCLUDE_DIRECTORIES(external/)
 
 FIND_PACKAGE(Eigen3 3.3 REQUIRED NO_MODULE)
 
+find_package(Boost)
+include_directories(${Boost_INCLUDE_DIRS})
+
+find_package(GSL)
+include_directories(${GSL_INCLUDE_DIRS})
+
 MESSAGE("
 *****************************************************************************
 * REQUIRED EXTERNAL LIBRARIES
