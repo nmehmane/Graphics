@@ -35,7 +35,7 @@ void ssdr::init_bone_transforms(void)
 {
     // assume that we have the same number of vertices in both poses
     assert( rest_pose.rows() == frame_poses[0].rows() );
-    assert( num_handles > 1 );
+    //assert( num_handles > 1 );
     
     //sets the number of deformed frames/poses provided
     num_frames = frame_poses.size();
@@ -228,6 +228,7 @@ void ssdr::init_bone_transforms(void)
 
         for(int i = 0 ; i < num_vertices ; i++)
         {
+            printf("Calculating the best clustering!\n");
 
             best_err = 1000000;
             best_cluster = 0;
@@ -256,6 +257,16 @@ void ssdr::init_bone_transforms(void)
             clusters[best_cluster].push_back( i );
             
         }
+        printf( " rows = %d col = %d " , (int)clusters.size(), (int)clusters[0].size() );
+        printf(" the best cluster is ----> \n" );
+        for( auto &v : clusters )
+        {
+            for( auto &p : v )
+            {
+                printf("%d  ", p );
+            }
+            printf("\n");
+        }
         printf( " Finished iteration: %d\n", iter );
         iter++;
         
@@ -268,6 +279,9 @@ void ssdr::init_bone_transforms(void)
 
         for( int n = 0 ; n < num_handles ; n++ )
         {
+            std::sort( clusters_copy[n].begin(), clusters_copy[n].end() );
+            std::sort( clusters[n].begin(), clusters[n].end() );
+
             if( clusters[n].size() != clusters_copy[n].size() )
             {
                 terminate_loop = false;

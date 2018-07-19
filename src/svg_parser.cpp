@@ -177,10 +177,10 @@ int main(int argc, char** argv)
     for( auto elem : ssdr_elem.frame_poses )
     {
         // print the matrix
-//        std::cout << "Pose\n" << elem << std::endl;
+        std::cout << "Pose\n" << elem << std::endl;
     }
      // print the rest pose matrix
-//     std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
+     std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
 
     ssdr_elem.init_bone_transforms( );
 
