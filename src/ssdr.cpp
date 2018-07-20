@@ -108,6 +108,8 @@ void ssdr::init_bone_transforms(void)
     
         int row = 0;
         clusters_copy.clear();
+        handle_translations.clear();
+        handle_rotations.clear();
         //for each cluster
         for( auto &cluster : clusters )
         {
@@ -220,7 +222,7 @@ void ssdr::init_bone_transforms(void)
         Eigen::Vector2d rest_transformed;
         double err = 0;
         double best_err = 0;
-        double best_cluster = 0;
+        int best_cluster = 0;
 
         // empty the clusters
         for(auto &w : clusters)
@@ -230,7 +232,7 @@ void ssdr::init_bone_transforms(void)
         {
             printf("Calculating the best clustering!\n");
 
-            best_err = 1000000;
+            //best_err = 1000000;
             best_cluster = 0;
             err = 0;
             
@@ -246,7 +248,14 @@ void ssdr::init_bone_transforms(void)
             {
                 rest_transformed = handle_rotations[j]*r_p + handle_translations[j]; 
                 err = (rest_transformed - d_p).dot(rest_transformed - d_p);
-                if( err < best_err )
+                printf(" err = %lf for index %d handle %d \n", err, i, j);
+                
+                if( j == 0 )
+                {
+                    best_err = err;
+                    best_cluster = j;
+                }
+                else if( err < best_err )
                 {
                     best_err = err;
                     best_cluster = j;
@@ -254,6 +263,7 @@ void ssdr::init_bone_transforms(void)
 
 
             }
+            printf("best cluster is %d for index %d \n", best_cluster, i );
             clusters[best_cluster].push_back( i );
             
         }
