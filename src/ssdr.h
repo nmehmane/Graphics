@@ -13,6 +13,7 @@ class ssdr {
     ssdr();
     ~ssdr();
     void init_bone_transforms(void);
+    void init_bone_transforms_2(void);
     //double avg_dis(int i, int j);
     //void find_neighbors(int sj, int maxSelect, std::vector<int>& selected);
   //make all fields public

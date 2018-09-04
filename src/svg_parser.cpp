@@ -182,7 +182,8 @@ int main(int argc, char** argv)
      // print the rest pose matrix
      std::cout << "Rest Pose\n" << ssdr_elem.rest_pose << std::endl;
 
-    ssdr_elem.init_bone_transforms( );
+    //ssdr_elem.init_bone_transforms( );
+    ssdr_elem.init_bone_transforms_2( );
 
 
     return 0;
