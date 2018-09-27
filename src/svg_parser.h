@@ -34,7 +34,10 @@ public:
 
   void path_exit();
 public:
-   std::vector<double> vertices; // will hold the vertices as [ x0 y0 x1 y1 ... ]
+  std::vector<double> vertices; // will hold the vertices as [ x0 y0 x1 y1 ... ]
+  std::vector<double> v_tangents; // will hold the tangents as [ x'0 y'0 ...]
+  std::vector<Eigen::Vector4i> curves; // will hold the index of the 4 control point of the bezier curve as [i0 i'0 i'1 i1]
+  bool path_start;
 };
 
 typedef 
@@ -52,6 +55,6 @@ typedef
     tag::element::rect
   >::type processed_elements_t;
 
-void loadSvg(xml_element_t xml_root_element, Eigen::MatrixXd& rest_pose);
+void loadSvg(xml_element_t xml_root_element, Eigen::MatrixXd& rest_pose, Eigen::MatrixXd& rp_tangents, std::vector<Eigen::Vector4i>& rp_curves);
 
 #endif

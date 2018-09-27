@@ -6,6 +6,7 @@
 #include <gsl/gsl_linalg.h> // for svd
 #include <Eigen/Dense>
 #include <iostream>
+#include "gco/GCoptimization.h"
 
 ssdr::ssdr()
 {
@@ -851,4 +852,351 @@ void ssdr::init_bone_transforms_2(void)
     }while( iter != num_handles );
     
     
+}
+
+void ssdr::match_samples_to_curve(void)
+{
+    //currently we are selecting samples in such a way that each sample corresponds to the t=0 endpoint of one of
+    // the curves. so we simply look though the t=0 endpoint of all curves to find out which curve each sample 
+    // belongs to. 
+    
+    rp_sample_curves = new int[rest_pose_samples.rows()];
+
+    rp_tg_samples = Eigen::MatrixXd::Zero(rest_pose_samples.rows(),2);
+    for(int i = 0; i < rest_pose_samples.rows(); i++)
+    {
+        for(int j = 0; j < rp_curves.size(); j++)
+        {
+            int c_i = (rp_curves.at(j))(0);
+            double err = rest_pose_samples(i,0) - rest_pose(c_i,0);
+            err *= err;
+            err += ( ( rest_pose_samples(i,1) - rest_pose(c_i,1) ) * ( rest_pose_samples(i,1) - rest_pose(c_i,1) ) );
+            //printf("err = %lf\n", err);
+
+            if( err < 0.5 )
+            {
+                rp_sample_curves[i] = j;
+                int tg_i = (rp_curves.at(j))(1);
+                // set the tangent
+                rp_tg_samples(i,0) = rp_tangents(tg_i,0) - rest_pose(c_i,0);
+                rp_tg_samples(i,1) = rp_tangents(tg_i,1) - rest_pose(c_i,1);
+
+            }
+        }
+    }
+    std::cout << " rest pose sample tg \n" << rp_tg_samples << std::endl;
+
+    Eigen::MatrixXd deformed_pose = frame_poses.at(0);
+    dp_tg_samples = Eigen::MatrixXd::Zero(deformed_pose_samples.rows(),2);
+
+    for(int i = 0; i < deformed_pose_samples.rows(); i++)
+    {
+        //printf("\n***************\n");
+        for(int j = 0; j < df_curves.size(); j++)
+        {
+            int c_i = (df_curves.at(j))(0);
+            double err = deformed_pose_samples(i,0) - deformed_pose(c_i,0);
+            err *= err;
+            err += ( ( deformed_pose_samples(i,1) - deformed_pose(c_i,1) ) * ( deformed_pose_samples(i,1) - deformed_pose(c_i,1) ) );
+            //printf("err = %lf\n", err);
+
+            if( err < 0.5 )
+            {
+                int tg_i = (rp_curves.at(j))(1);
+                // set the tangent
+                dp_tg_samples(i,0) = df_tangents(tg_i,0) - deformed_pose(c_i,0);
+                dp_tg_samples(i,1) = df_tangents(tg_i,1) - deformed_pose(c_i,1);
+            }
+        }
+    }
+    std::cout << " deformed pose sample tg \n" << dp_tg_samples << std::endl;
+
+}
+
+void ssdr::normalize_tgs(void)
+{
+    double length = 0.0;
+    for(int i = 0; i < dp_tg_samples.rows(); i++)
+    {
+        length = (dp_tg_samples(i,0)*dp_tg_samples(i,0)) + (dp_tg_samples(i,1)*dp_tg_samples(i,1));
+        length = std::sqrt( length );
+        printf(" length = %lf\n", length );
+        dp_tg_samples(i,0) = dp_tg_samples(i,0) / length;
+        dp_tg_samples(i,1) = dp_tg_samples(i,1) / length;
+        printf(" normal df x = %lf y = %lf\n", dp_tg_samples(i,0),dp_tg_samples(i,1));
+    }
+    
+    for(int i = 0; i < rp_tg_samples.rows(); i++)
+    {
+        length = (rp_tg_samples(i,0)*rp_tg_samples(i,0)) + (rp_tg_samples(i,1)*rp_tg_samples(i,1));
+        length = std::sqrt( length );
+        rp_tg_samples(i,0) = rp_tg_samples(i,0) / length;
+        rp_tg_samples(i,1) = rp_tg_samples(i,1) / length;
+        printf(" normal rp x = %lf y = %lf\n", rp_tg_samples(i,0),rp_tg_samples(i,1));
+    }
+}
+
+void ssdr::find_correspondence(void)
+{
+    // for each sample in the rest-pose we pair it up with each sample from the 
+    // deformed pose
+    Eigen::Vector2d p_bar(0, 0);
+    Eigen::Vector2d q_bar(0, 0);
+
+    // holds the coordinates of the second rest pose and the second deformed pose
+    Eigen::Vector2d r_point_2(0, 0);
+    Eigen::Vector2d d_point_2(0, 0);
+
+    for( int i = 0; i <rest_pose_samples.rows(); i++)
+    {
+        std::vector<Eigen::Matrix2d> temp_R;
+        std::vector<Eigen::Vector2d> temp_T;
+
+        // Add the normalized tangent to the coordinates of the vertex to get a second point
+        r_point_2(0) = rest_pose_samples(i,0) + rp_tg_samples(i,0);
+        r_point_2(1) = rest_pose_samples(i,1) + rp_tg_samples(i,1);
+
+        for(int j = 0; j < deformed_pose_samples.rows(); j++)
+        {
+            // Add the normalized tangent to the coordinates of the vertex to get a second point
+            d_point_2(0) = deformed_pose_samples(j,0) + dp_tg_samples(j,0);
+            d_point_2(1) = deformed_pose_samples(j,1) + dp_tg_samples(j,1);
+            
+            //now we have a cluster containing two points in each pose we find the center of each cluster
+
+            p_bar(0) = (rest_pose_samples(i,0) + r_point_2(0))/2;
+            p_bar(1) = (rest_pose_samples(i,1) + r_point_2(1))/2;
+            
+            q_bar(0) = (deformed_pose_samples(j,0) + d_point_2(0))/2;
+            q_bar(1) = (deformed_pose_samples(j,1) + d_point_2(1))/2;
+
+            std::cout << " p_bar" << std::endl << p_bar << std::endl;
+            std::cout << " q_bar" << std::endl << q_bar << std::endl;
+
+            // using the centroid of the cluster ( in both rest and deformed pose ) we calculate the 
+            // optimal initial translation and rotation of the cluster
+
+            // X and Y are the d × (n=2) matrices that have xi and yi as their columns
+            // xi = pi −p_bar, yi = qi −q_bar
+            Eigen::MatrixXd X = Eigen::MatrixXd::Zero(2,2);
+            Eigen::MatrixXd Y = Eigen::MatrixXd::Zero(2,2);
+
+            double xi_x = 0;
+            double xi_y = 0;
+            double yi_x = 0;
+            double yi_y = 0;
+            
+            //setting the first columns
+            xi_x = rest_pose_samples(i,0) - p_bar(0);
+            xi_y = rest_pose_samples(i,1) - p_bar(1);
+            
+            X.col(0) << xi_x, xi_y;
+            
+            yi_x = deformed_pose_samples(j,0) - q_bar(0);
+            yi_y = deformed_pose_samples(j,1) - q_bar(1);
+
+            Y.col(0) << yi_x, yi_y;
+
+            //setting the second columns
+            xi_x = r_point_2(0) - p_bar(0);
+            xi_y = r_point_2(1) - p_bar(1);
+            
+            X.col(1) << xi_x, xi_y;
+            
+            yi_x = d_point_2(0) - q_bar(0);
+            yi_y = d_point_2(1) - q_bar(1);
+
+            Y.col(1) << yi_x, yi_y;
+
+            std::cout << " X" << std::endl << X << std::endl;
+            std::cout << " Y" << std::endl << Y << std::endl;
+
+            // 2x2 covariance matrix
+            Eigen::MatrixXd S_tmp = X * Y.transpose();
+            std::cout << " 2x2 covariance matrix" << std::endl << S_tmp << std::endl;
+            
+            // Compute SVD
+            Eigen::JacobiSVD<Eigen::MatrixXd> svd;
+            svd.compute( S_tmp, Eigen::ComputeThinU | Eigen::ComputeThinV);
+            std::cout << "Its singular values are:" << std::endl << svd.singularValues() << std::endl;
+            std::cout << "Its left singular vectors are the columns of the thin U matrix:"
+                      << std::endl << svd.matrixU() << std::endl;
+            std::cout << "Its right singular vectors are the columns of the thin V matrix:"
+                      << std::endl << svd.matrixV() << std::endl;
+
+            // The optimal rotation is V diag( 1,1,det(V*U.traspose) ) U.transpose
+
+            Eigen::MatrixXd Ut = svd.matrixU().transpose();
+            Eigen::MatrixXd diag_mat = Eigen::MatrixXd::Identity(2,2);
+            diag_mat(1,1) = (svd.matrixV() * Ut).determinant();
+            Eigen::MatrixXd R = svd.matrixV() * diag_mat * Ut;
+            Eigen::Vector2d T = q_bar - (R*p_bar);
+
+            // store the pair's R and T
+            temp_R.push_back( R );
+            temp_T.push_back( T );
+
+            std::cout << " R" << std::endl << R << std::endl;
+            std::cout << " T" << std::endl << T << std::endl;
+
+        }
+
+        pair_R.push_back(temp_R);
+        pair_T.push_back(temp_T);
+    }
+
+    // now we have n x n candidate R,T s for each sample
+    /* For each vertex A in the rest position:
+            For every R&T:
+                Apply The current R and T to vertex A and get a position C.
+                Find the closest vertex in the deformed pose to this point
+                Calculate the distance and store it a a goodness metric
+                
+                Apply R and T to the Tangent of this point in rest pose and see if it points to the 
+                same direction as the tangent of the point in the deformed pose
+    */
+    //holds the transformed sample point from the rest pose
+    Eigen::Vector2d transformed_r_p(0.0, 0.0);
+    
+    //stores the number of labels
+    int num_labels = rest_pose_samples.rows() * rest_pose_samples.rows();
+    //number of sample points
+    int num_samples = rest_pose_samples.rows();
+
+    // setting up the array for data costs i.e. the cost of using Label l_i ( Ri,Ti ) for point p
+    int *data = new int[num_samples * num_labels];
+
+    // setting up the array for smooth costs
+    int *smooth = new int[num_labels*num_labels];
+
+    for( int i = 0; i <rest_pose_samples.rows(); i++)
+    {
+        int label_index = 0;
+            printf("data terms for %d\n" , i );
+
+        //for each sample in the rest_pose apply all possible R,T pairs one by one to get the transformed
+        // point
+        for( int ii = 0; ii < rest_pose_samples.rows(); ii++)
+        {
+            //the sample point at the rest pose is stored as a 2D vector
+            Eigen::Vector2d rp_sample_p = (rest_pose_samples.row(i)).transpose();
+
+            for(int jj = 0; jj < deformed_pose_samples.rows(); jj++)
+            {
+                transformed_r_p = ( pair_R[ii][jj] * rp_sample_p ) + pair_T[ii][jj];
+                //std::cout << " transformed rest sample point" << std::endl << transformed_r_p << std::endl;
+
+                double min_label_cost = 0.0;
+
+                for(int kk = 0; kk < deformed_pose_samples.rows(); kk++)
+                {
+                    //compute euclidean distance squared between the transformed rest point and the deformed point
+                    double e_distance = ( transformed_r_p - (deformed_pose_samples.row(kk)).transpose() ).squaredNorm( );
+
+                    if( kk == 0 )
+                    {
+                        min_label_cost = e_distance;
+                    }
+                    // choose the vertex that gives the minimum
+                    else if( e_distance < min_label_cost )
+                    {
+                        min_label_cost = e_distance;
+                    }
+                }
+
+                data[i*num_labels + (label_index) ] = (int)min_label_cost;
+                printf(" %d  " , data[i*num_labels + (label_index) ] );
+
+                label_index++;
+            }
+        }
+
+            printf("\n");
+
+    }
+    
+    for ( int l1 = 0; l1 < num_labels; l1++ )
+    {
+        printf("smoothness term for %d\n", l1);
+        for (int l2 = 0; l2 < num_labels; l2++ )
+        {
+            smooth[l1+l2*num_labels] = (l1-l2)*(l1-l2) < 1  ? 0 : 10000;
+            printf(" %d ",smooth[l1+l2*num_labels]);
+        }
+        printf("\n");
+    }
+
+	int *result = new int[num_samples];
+    try{
+		GCoptimizationGeneralGraph *gc = new GCoptimizationGeneralGraph(num_samples,num_labels);
+		gc->setDataCost(data);
+		gc->setSmoothCost(smooth);
+
+		// now set up a neighborhood system
+        int** neighborsIndexes = new int*[rest_pose_samples.rows()];
+        int* numNeighbors = new int[rest_pose_samples.rows()];
+        int** neighborsWeights = new int*[rest_pose_samples.rows()];
+
+        set_neighborhood(numNeighbors,neighborsIndexes,neighborsWeights);
+
+        //pass in all neighbor information at once
+        gc->setAllNeighbors(numNeighbors,neighborsIndexes,neighborsWeights);
+
+		printf("\nBefore optimization energy is %lld",gc->compute_energy());
+		gc->expansion(2);// run expansion for 2 iterations.
+        gc->swap(2);
+		printf("\nAfter optimization energy is %lld",gc->compute_energy());
+
+		for ( int  i = 0; i < num_samples; i++ )
+        {
+			result[i] = gc->whatLabel(i);
+            printf(" for point %d label %d was chosen\n",i,result[i]);
+        }
+
+		delete gc;
+	}
+	catch (GCException e){
+		e.Report();
+	}
+
+	delete [] result;
+	delete [] smooth;
+	delete [] data;
+
+}
+
+
+void ssdr::set_neighborhood(int *numNeighbors,int **a,int** neighborsWeights)
+{
+
+    for( int i = 0; i <rest_pose_samples.rows(); i++)
+    {
+        std::vector<int> temp;
+
+        for( int j = i; j < rest_pose_samples.rows(); j++)
+        {
+            if( rp_sample_curves[i] == rp_sample_curves[j] )
+            {
+                //then j is the t=1 end point of the same curve
+                temp.push_back(j);
+            }
+            else if( (rp_sample_curves[i]-1) == rp_sample_curves[j] )
+            {
+                //then j is the t=0 end point of the curve whose t=1
+                // end point is rest_pose_samples.rows(i)
+                temp.push_back(j);
+            }
+        }
+        numNeighbors[i] = temp.size();
+        a[i] = new int[temp.size()];
+        neighborsWeights[i] = new int[temp.size()];
+
+        
+        for(int k = 0 ; k < temp.size(); k++)
+        {
+            a[i][k] = temp.at(k);
+            neighborsWeights[i][k] = 1;
+        }
+    }
+
 }
