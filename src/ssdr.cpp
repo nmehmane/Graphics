@@ -107,6 +107,7 @@ void ssdr::perform_ssdr()
     }
     */
     int iter = 0;
+    std::vector<int> label_assignment;
     // now we have n x n Labels we copute the optimal label assignment.
     do{
         // to compute the the optimal label assignment we will compute the data term,
@@ -155,8 +156,8 @@ void ssdr::perform_ssdr()
   */    
         int num_points = rp_SamplePoints.size();
         int num_labels = Rs.size();
-        std::vector<int> label_assignment = assign_labels( num_points, num_labels, data, smooth,
-                                                 numNeighbors, neighborsIndexes, neighborsWeights );
+        label_assignment = assign_labels( num_points, num_labels, data, smooth,
+                                          numNeighbors, neighborsIndexes, neighborsWeights );
         printf("label assignment\n");
         for( int l : label_assignment )
         {
@@ -216,7 +217,19 @@ void ssdr::perform_ssdr()
         
     }while( (++iter) < 5 );
 
-                                             
+    std::vector<Point> transformed_points = transform_sample_points( rp_SamplePoints, Rs, Ts, label_assignment); 
+    
+
+   /* int k = 0;
+    for( auto& qq : transformed_points )
+    {
+        std::cout << " original point\n" << rp_SamplePoints.at(k) << 
+                    "\n Rotation and Translation " << Rs.at( label_assignment.at(k) ) <<
+                    "\n" << Ts.at( label_assignment.at(k) ) << "\nTransformed point\n" <<
+                    qq << std::endl;
+        k++;
+    } 
+     */                                        
 }
 /*******************************************************************************************************/
 // used to sample the inputed vector of curves at samples_per_curve rate 
@@ -859,36 +872,27 @@ void ssdr::recompute_RT( const std::vector<Point>& pose_1,
 
 /*******************************************************************************************************/
 
-/*
-std::vector<Eigen::Vector2d> ssdr::transform_sample_points( )
+// apply the appropriate labels to the points and 
+std::vector<Point> ssdr::transform_sample_points( const std::vector<Point>& original_points, 
+                                                  const std::vector<Eigen::Matrix2d>& Rs,
+                                                  const std::vector<Eigen::Vector2d>& Ts,
+                                                  const std::vector<int>& label_numbers)
 {
-    // get the rest pose coordinates
-    Eigen::Vector2d point(0,0);
-
-    std::vector<Eigen::Vector2d> transformed_points;
-
-    int label_num = 0;
-
-    for( int i = 0 ; i < rest_pose_samples ; i++ )
+    std::vector<Point> transformed_points;
+    int i = 0;
+    int index = 0;
+    for( auto& p : original_points )
     {
-        point(0) = rest_pose_samples(i,0);
-        point(1) = rest_pose_samples(i,1);
-        
-        label_num = vertex_label_index.at(i);
-
-        // calculate the transformed rest pose
-        point = pair_R * point + pair_T;
-        
-        transformed_points.push_back( point );
-
+        index = label_numbers.at(i);
+        const Eigen::Matrix2d& R = Rs.at(index); 
+        const Eigen::Vector2d& T = Ts.at(index);
+        Point q = R * p + T;
+        transformed_points.push_back( q );
+      //  std::cout << "\nR\n" << R << "\nT\n" << T << "\npoint\n" << p << "\nother\n" << q << std::endl;
+        i++;
+        index++;
     }
     return transformed_points;
 }
 
-void ssdr::draw_curves( )
-{
-
-}
-
-*/
 }

@@ -106,6 +106,10 @@ class ssdr {
                        const std::vector<std::vector<int>>& pose_1_clusters,
                        const std::vector<std::vector<int>>& pose_2_clusters );
 
+    std::vector<Point> transform_sample_points( const std::vector<Point>& original_points, 
+                                                const std::vector<Eigen::Matrix2d>& Rs,
+                                                const std::vector<Eigen::Vector2d>& Ts,
+                                                const std::vector<int>& label_numbers );
 
     /*    Rest Pose    */
     // is set by svg parser to hold the end points of the curves
