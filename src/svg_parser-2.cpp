@@ -116,49 +116,57 @@ void Context::path_exit()
     //std::cout<<" path_exit " << std::endl;
 }
 
-void loadSvg( xml_element_t xml_root_element, 
-              std::vector<ssdr_ns::Point>& curveEndPoints, 
-              std::vector<ssdr_ns::Point>& curveMiddlePoints, 
-              std::vector<Eigen::Vector4i>& curves )
+void loadSvg(xml_element_t xml_root_element, Eigen::MatrixXd& rest_pose, Eigen::MatrixXd& rp_tangents, std::vector<Eigen::Vector4i>& rp_curves)
 {
     Context context;
     document_traversal<
       processed_elements<processed_elements_t>,
       processed_attributes<traits::shapes_attributes_by_element>
     >::load_document(xml_root_element, context);
+    //  an N x 2 matrix
+    rest_pose = Eigen::MatrixXd::Zero((context.vertices.size()/2) ,2);
+    rp_tangents = Eigen::MatrixXd::Zero((context.v_tangents.size()/2) ,2);
 
     std::vector<double>::iterator it;
     int row = 0;
     for( it = context.vertices.begin(); it != context.vertices.end(); it++,row++  )
     {
-        ssdr_ns::Point p(*it,*(++it));
-         curveEndPoints.push_back(p);
+        rest_pose(row,0) = *it;
+        //printf(" index of vertex = %d\n", row );
+        //printf(" x = %lf", rest_pose(row,0)); 
+        rest_pose(row,1) = *(++it);
+        //printf(" y = %lf\n", rest_pose(row,1)); 
     }
 
     row = 0;
     for( it = context.v_tangents.begin(); it != context.v_tangents.end(); it++,row++  )
     {
-        ssdr_ns::Point p(*it,*(++it));
-         curveMiddlePoints.push_back(p);
+        rp_tangents(row,0) = *it;
+        //printf(" index of tangent = %d\n", row );
+        //printf(" x' = %lf",rp_tangents(row,0)); 
+        rp_tangents(row,1) = *(++it);
+        //printf(" y' = %lf\n", rp_tangents(row,1)); 
     }
     
-    std::vector<Eigen::Vector4i>::iterator it2;
+    std::vector<Eigen::Vector4i>::iterator itt;
     row = 0;
-    for( it2 = context.curves.begin(); it2 != context.curves.end(); it2++)
+    for( itt = context.curves.begin(); itt != context.curves.end(); itt++)
     {
-        curves.push_back(*it2);
+        rp_curves.push_back(*itt);
+        //printf("curve ( %d )\n", row );
+        //std::cout<<  rp_curves.back() << std::endl;
         row++;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // change args to ./exe <number of handles> <svg rest-pose> <number of frames> <svg pose 1> <svg pose2> ...
+    // Minimum requirements: 1)number of handels 2)rest pose 3)number of frames ( minimum 2 ) 4,5)minimum of two frames
     if( argc < 7 )
     {
-        std::cout <<"./exe <number of handles> <svg rest-pose>" 
-                  <<" <number of frames> <svg pose 1> <svg pose2> ..."
-                  <<" <rest-pose samples> <deformed-pose samples>" 
-                  << std::endl;
+        std::cout<<"./exe <number of handles> <svg rest-pose> <number of frames> <svg pose 1> <svg pose2> ..."
+                   " <rest-pose samples> <deformed-pose samples>"<<std::endl;
         return -1;
     }
     
@@ -176,12 +184,9 @@ int main(int argc, char** argv)
     try
     {
         rapidxml_ns::file<> xml_file(argv[2]);  
-        rapidxml_ns::xml_document<> doc;    
+        rapidxml_ns::xml_document<> doc;    // character type defaults to char
         doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
-        loadSvg(doc.first_node(), 
-                ssdr_elem.rp_CurveEndPoints,
-                ssdr_elem.rp_CurveMiddlePoints, 
-                ssdr_elem.rp_Curves);
+        loadSvg(doc.first_node(), ssdr_elem.rest_pose, ssdr_elem.rp_tangents, ssdr_elem.rp_curves);
 
     }
     catch (std::exception const & e)
@@ -214,13 +219,15 @@ int main(int argc, char** argv)
 
     try
     {
-        rapidxml_ns::file<> xml_file(argv[4]);  
-        rapidxml_ns::xml_document<> doc;
-        doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
-        loadSvg(doc.first_node(),
-                ssdr_elem.dfp_CurveEndPoints, 
-                ssdr_elem.dfp_CurveMiddlePoints,
-                ssdr_elem.dfp_Curves);
+        for( int i = 0 ; i < num_poses ; i++ )
+        {
+            Eigen::MatrixXd new_pose;
+            rapidxml_ns::file<> xml_file(argv[4 + i]);  
+            rapidxml_ns::xml_document<> doc;    // character type defaults to char
+            doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
+            loadSvg(doc.first_node(), new_pose, ssdr_elem.df_tangents, ssdr_elem.df_curves);
+            (ssdr_elem.frame_poses).push_back( new_pose );
+        }
 
     }
     catch (std::exception const & e)
@@ -229,37 +236,83 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // print the rest pose
-    std::cout << "\n\nRest Pose Curve End Points\n\n" << std::endl;
-
-    for( auto& p : ssdr_elem.rp_CurveEndPoints )
+    // load the rest pose samples 
+    try
     {
-        std::cout << p << std::endl;
-    }
-    std::cout << "\n\nRest Pose Curve Middle Points\n\n" << std::endl;
+        rapidxml_ns::file<> xml_file(argv[4+num_poses]);  
+        rapidxml_ns::xml_document<> doc;    // character type defaults to char
+        Eigen::MatrixXd df_tangents_bs;
+        std::vector<Eigen::Vector4i> df_curves_bs;
 
-    for( auto& p : ssdr_elem.rp_CurveMiddlePoints )
-    {
-        std::cout << p << std::endl;
-    }
-    
-    // print the deformed pose
-    std::cout << "\n\nDeformed Pose End Points\n\n" << std::endl;
+        doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
+        loadSvg(doc.first_node(), ssdr_elem.rest_pose_samples, df_tangents_bs ,df_curves_bs );
 
-    for( auto& p : ssdr_elem.dfp_CurveEndPoints )
-    {
-        std::cout << p << std::endl;
     }
-    std::cout << "\n\nDeformed Pose Curve Middle Points\n\n" << std::endl;
+    catch (std::exception const & e)
+    {
+        std::cerr << "Error loading rest Pose samples: " << e.what() << std::endl;
+        return 1;
+    }
 
-    for( auto& p : ssdr_elem.dfp_CurveMiddlePoints )
+    //load the deformed pose samples
+    try
     {
-        std::cout << p << std::endl;
+        rapidxml_ns::file<> xml_file(argv[4+num_poses+1]);  
+        rapidxml_ns::xml_document<> doc;    // character type defaults to char
+        Eigen::MatrixXd df_tangents_bs;
+        std::vector<Eigen::Vector4i> df_curves_bs;
+
+        doc.parse<rapidxml_ns::parse_no_string_terminators>(xml_file.data());  
+        loadSvg(doc.first_node(), ssdr_elem.deformed_pose_samples, df_tangents_bs ,df_curves_bs );
+
     }
+    catch (std::exception const & e)
+    {
+        std::cerr << "Error loading Deformed Pose samples: " << e.what() << std::endl;
+        return 1;
+    }
+
+
+    // testing
+    int i = 1;
+    for( auto elem : ssdr_elem.frame_poses )
+    {
+        // print the matrix
+        std::cout << "\n\nPose\n\n" << elem << std::endl;
+    }
+     // print the rest pose matrix
+     std::cout << "\n\nRest Pose\n\n" << ssdr_elem.rest_pose << std::endl;
      
+     // print the rest pose samples matrix
+     std::cout << "\n\nRest Pose Samples\n\n" << ssdr_elem.rest_pose_samples << std::endl;
+
+     // print the deformed pose samples matrix
+     std::cout << "\n\nDeformed Pose Samples\n\n" << ssdr_elem.deformed_pose_samples << std::endl;
     
+    //ssdr_elem.match_samples_to_curve( );
     ssdr_elem.perform_ssdr();
+    //ssdr_elem.match_samples_to_curve2( );
+    //ssdr_elem.normalize_tgs( );
+    //ssdr_elem.find_correspondence( );
+    //ssdr_elem.init_bone_transforms( );
+    //ssdr_elem.init_bone_transforms_2( );
+
     // testing shit
+
+ static Point2 bezCurve[4] = {	/*  A cubic Bezier curve	*/
+	{ 0.0, 0.0 },
+	{ 1.0, 2.0 },
+	{ 3.0, 3.0 },
+	{ 4.0, 2.0 },
+    };
+    static Point2 arbPoint = { 3.5, 2.0 }; /*Some arbitrary point*/
+    Point2	pointOnCurve;		 /*  Nearest point on the curve */
+    double t_param = 0; 
+    /*  Find the closest point */
+    pointOnCurve = NearestPointOnCurve(arbPoint, bezCurve, &t_param);
+    printf("pointOnCurve : (%4.4f, %4.4f)\n", pointOnCurve.x,
+		pointOnCurve.y);
+    printf("parameter of the point : %lf\n",t_param);
 
     return 0;
 }

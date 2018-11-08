@@ -22,7 +22,7 @@ int main()
     double t_param = 0; 
     /*  Find the closest point */
     pointOnCurve = NearestPointOnCurve(arbPoint, bezCurve, &t_param);
-    printf("pointOnCurve : (%4.4f, %4.4f)\n", pointOnCurve.x,
-		pointOnCurve.y);
-    printf("parameter of the point : %lf\n",t_param);
+//    printf("pointOnCurve : (%4.4f, %4.4f)\n", pointOnCurve.x,
+//		pointOnCurve.y);
+ //   printf("parameter of the point : %lf\n",t_param);
 }

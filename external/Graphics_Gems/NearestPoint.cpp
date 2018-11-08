@@ -80,7 +80,7 @@ Point2  NearestPointOnCurve(Point2 P, Point2 *V, double *tt)
     }
 
     /*  Return the point on the curve at parameter value t */
-    printf("t : %4.12f\n", t);
+//    printf("t : %4.12f\n", t);
     *tt = t;
     return (Bezier(V, DEGREE, t, (Point2 *)NULL, (Point2 *)NULL));
 }

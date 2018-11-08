@@ -7,6 +7,7 @@
 #include "rapidxml_ns/rapidxml_ns_utils.hpp"
 #include "svgpp/policy/xml/rapidxml_ns.hpp"
 #include "svgpp/svgpp.hpp"
+#include "ssdr.h"
 
 using namespace svgpp;
 
@@ -55,6 +56,9 @@ typedef
     tag::element::rect
   >::type processed_elements_t;
 
-void loadSvg(xml_element_t xml_root_element, Eigen::MatrixXd& rest_pose, Eigen::MatrixXd& rp_tangents, std::vector<Eigen::Vector4i>& rp_curves);
+void loadSvg(xml_element_t xml_root_element,
+             std::vector<ssdr_ns::Point>& rest_pose,
+             std::vector<ssdr_ns::Point>& rp_tangents, 
+             std::vector<Eigen::Vector4i>& rp_curves);
 
 #endif
