@@ -21,7 +21,6 @@ ssdr::~ssdr()
 {
 }
 
-/*                 Many pointer argument problems                */
 
 /*******************************************************************************************************/
 void ssdr::perform_ssdr()
@@ -70,7 +69,7 @@ void ssdr::perform_ssdr()
     {
         std::cout << q << std::endl;
     }
-    printf(" size = %d \n", dfp_SamplePoint_tg.size() );
+    printf(" size = %lu \n", dfp_SamplePoint_tg.size() );
     dfp_SamplePoint_tg = normalize_tangents( dfp_SamplePoint_tg );
 
     for( auto & ntg : dfp_SamplePoint_tg )
