@@ -111,6 +111,11 @@ class ssdr {
                                                 const std::vector<Eigen::Vector2d>& Ts,
                                                 const std::vector<int>& label_numbers );
 
+    void output_svg( const std::vector<Point>& pose_1_samples, 
+                     const std::vector<Point>& pose_2_samples, 
+                     const std::vector<std::vector<int>>& pose_1_clusters,
+                     const std::vector<std::vector<int>>& pose_2_clusters );
+
     /*    Rest Pose    */
     // is set by svg parser to hold the end points of the curves
     std::vector<Point> rp_CurveEndPoints;

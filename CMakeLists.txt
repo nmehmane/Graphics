@@ -1,6 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 PROJECT(SSDR-2012 CXX C)
 
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 SET(CMAKE_BUILD_TYPE Debug)
 
@@ -15,6 +16,9 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 find_package(GSL)
 include_directories(${GSL_INCLUDE_DIRS})
+
+find_package(Cairo)
+include_directories(${CAIRO_INCLUDE_DIRS})
 
 ## GCO
 set(gco_srcs
@@ -47,6 +51,7 @@ MESSAGE("
 *   Eigen   
 *   Boost  
 *   SVG++ : header only/ headers included in the project
+*   Cairo
 *****************************************************************************
 ")
 
@@ -59,3 +64,4 @@ ADD_EXECUTABLE(svg_parser ${SRC_FILES})
 TARGET_LINK_LIBRARIES(svg_parser Eigen3::Eigen)
 target_link_libraries(svg_parser gco)
 target_link_libraries(svg_parser gems)
+target_link_libraries(svg_parser ${CAIRO_LIBRARIES})

@@ -10,7 +10,10 @@
 #include "gco/GCoptimization.h"
 #include "Graphics_Gems/GraphicsGems.h"
 #include "Graphics_Gems/NearestPoint.h"
-
+#include <cairo.h>
+#include <cairo-svg.h> 
+#include <string>
+#include <iostream>
 namespace ssdr_ns
 {
 ssdr::ssdr()
@@ -106,6 +109,8 @@ void ssdr::perform_ssdr()
         std::cout <<  t << std::endl;
     }
     */
+    std::vector<std::vector<int>> pose_1_clusters;
+    std::vector<std::vector<int>> pose_2_clusters;
     int iter = 0;
     std::vector<int> label_assignment;
     // now we have n x n Labels we copute the optimal label assignment.
@@ -164,7 +169,7 @@ void ssdr::perform_ssdr()
             printf(" %d   ",l);
         }
         // now we have a label assignment we separate the rest pose clusters based on this
-        std::vector<std::vector<int>> pose_1_clusters;
+        pose_1_clusters.clear();
         std::vector<int> label_numbers;
 
         set_restpose_clusters( label_assignment, num_points, 
@@ -182,7 +187,7 @@ void ssdr::perform_ssdr()
         }
 
 
-        std::vector<std::vector<int>> pose_2_clusters;
+        pose_2_clusters.clear();
         // given the restpose clusters we compute the corresponding deformed pose clusters
         compute_corresponding_clusters( rp_SamplePoints, dfp_SamplePoints, label_numbers, Rs, Ts,
                                         pose_1_clusters, &pose_2_clusters );
@@ -229,7 +234,9 @@ void ssdr::perform_ssdr()
                     qq << std::endl;
         k++;
     } 
-     */                                        
+    */    
+                                        
+    output_svg( rp_SamplePoints, transformed_points, pose_1_clusters, pose_2_clusters  );
 }
 /*******************************************************************************************************/
 // used to sample the inputed vector of curves at samples_per_curve rate 
@@ -893,6 +900,131 @@ std::vector<Point> ssdr::transform_sample_points( const std::vector<Point>& orig
         index++;
     }
     return transformed_points;
+}
+
+/*******************************************************************************************************/
+
+void ssdr::output_svg( const std::vector<Point>& pose_1_samples, 
+                       const std::vector<Point>& pose_2_samples, 
+                       const std::vector<std::vector<int>>& pose_1_clusters,
+                       const std::vector<std::vector<int>>& pose_2_clusters )
+{
+    std::vector<Eigen::Vector3d> colors;
+    Eigen::Vector3d temp = Eigen::Vector3d( 0.5, 0.5, 0.5 );
+    colors.push_back( temp );
+    temp = Eigen::Vector3d( 1, 0, 0 );
+    colors.push_back( temp );
+    //colors.push_back( Eigen::Vector3d( 0.5, 0 , 0) );
+    colors.push_back( Eigen::Vector3d( 1, 1, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0.5, 0.5, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 1, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 0.5, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 1, 1 ) );
+    colors.push_back( Eigen::Vector3d( 0, 0, 1 ) );
+    colors.push_back( Eigen::Vector3d( 1, 0, 1 ) );
+    colors.push_back( Eigen::Vector3d( 0.5, 0, 0.5 ) );
+    
+    cairo_t *cr;
+    cairo_surface_t *surface;
+    cairo_pattern_t *pattern;
+    int x,y;
+
+    surface =
+      (cairo_surface_t *)cairo_svg_surface_create("final_results.svg", 1200.0, 1200.0);
+    cr = cairo_create(surface);
+    
+    // draw the original rest pose image curves in black ( 0 , 0 , 0 )
+    
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width( cr, 5 );
+
+    Point p0, p1, p2, p3;
+    
+    for( auto & curve : rp_Curves )
+    {
+        //end points
+        p0 = rp_CurveEndPoints.at(curve[0]);
+        p3 = rp_CurveEndPoints.at(curve[3]);
+        
+        //tangent control points
+        p1 = rp_CurveMiddlePoints.at(curve[1]);
+        p2 = rp_CurveMiddlePoints.at(curve[2]);
+        
+        cairo_move_to( cr, p0(0), p0(1) );
+        cairo_curve_to( cr, p1(0), p1(1), p2(0), p2(1), p3(0), p3(1) );
+        cairo_stroke( cr );
+
+    }
+
+    // draw the original deformed pose image curves in navy ( 0 , 0 , 0.5 )
+    
+    cairo_set_source_rgb(cr, 0, 0, 0.5);
+    cairo_set_line_width( cr, 5 );
+    
+    for( auto & curve : dfp_Curves )
+    {
+        //end points
+        p0 = dfp_CurveEndPoints.at(curve[0]);
+        p3 = dfp_CurveEndPoints.at(curve[3]);
+        
+        //tangent control points
+        p1 = dfp_CurveMiddlePoints.at(curve[1]);
+        p2 = dfp_CurveMiddlePoints.at(curve[2]);
+        
+        cairo_move_to( cr, p0(0), p0(1) );
+        cairo_curve_to( cr, p1(0), p1(1), p2(0), p2(1), p3(0), p3(1) );
+        cairo_stroke( cr );
+
+    }
+
+    // draw the rest pose sample point's clusters
+    
+    cairo_set_line_width( cr, 3 );
+    int j = 0;
+    for( auto& cluster : pose_1_clusters )
+    {
+        Eigen::Vector3d c = colors.at( j );
+        cairo_set_source_rgb(cr, c(0), c(1), c(2));
+
+        for( auto& index : cluster )
+        {
+            Point p = pose_1_samples.at( index );
+            cairo_arc(cr, p(0), p(1), 8, 0, 2*M_PI);
+            cairo_stroke( cr );
+
+        }
+        j++;
+    }
+
+    // draw the deformed pose sample point's clusters
+    
+    cairo_set_line_width( cr, 8 );
+    j = 0;
+    for( auto& cluster : pose_2_clusters )
+    {
+        Eigen::Vector3d c = colors.at( j );
+        cairo_set_source_rgb(cr, c(0), c(1), c(2));
+
+        for( auto& index : cluster )
+        {
+            Point p = pose_2_samples.at( index );
+            cairo_arc(cr, p(0), p(1), 8, 0, 2*M_PI);
+            cairo_stroke( cr );
+
+        }
+        j++;
+    }
+
+    /*cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width( cr, 5 );
+    for( auto& p : points )
+    {
+        cairo_arc(cr, p(0), p(1), 5, 0, 2*M_PI);
+        cairo_stroke( cr );
+    }*/
+    cairo_destroy (cr);
+    cairo_surface_destroy (surface);
+
 }
 
 }
