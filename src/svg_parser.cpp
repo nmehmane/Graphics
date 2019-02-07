@@ -23,6 +23,32 @@ void Context::on_exit_element()
 {
       //std::cout<<" On_exit_element " << std::endl;
 }
+void Context::transform_matrix(const boost::array<double, 6> & matrix)
+{
+
+}
+void Context::set_viewport(double viewport_x, double viewport_y, double viewport_width, double viewport_height)
+{
+    std::cout << " I'm in view port " << viewport_x << "  " << viewport_y << std::endl;
+    std::cout << viewport_width << "   " << viewport_height << std::endl; 
+    min_x = viewport_x;
+    min_y = viewport_y;
+    max_x = viewport_width;
+    max_y = viewport_height;
+}
+
+void Context::set_viewbox_size(double viewbox_width, double viewbox_height)
+{
+    std::cout << " view box " << viewbox_width << "  " << viewbox_height << std::endl;
+    box_width = viewbox_width;
+    box_height = viewbox_height;
+
+}
+void Context::disable_rendering()
+{
+
+}
+
   
 // converts relative coordinates to absolute coordinates if (m)
 void Context::path_move_to(double x, double y, tag::coordinate::absolute)
@@ -124,7 +150,9 @@ void loadSvg( xml_element_t xml_root_element,
     Context context;
     document_traversal<
       processed_elements<processed_elements_t>,
-      processed_attributes<traits::shapes_attributes_by_element>
+//      processed_attributes<traits::shapes_attributes_by_element>
+      processed_attributes<processed_attributes_t>,
+      viewport_policy<policy::viewport::as_transform>
     >::load_document(xml_root_element, context);
 
     std::vector<double>::iterator it;

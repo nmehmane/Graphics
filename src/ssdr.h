@@ -3,10 +3,14 @@
 
 #include <Eigen/Core>
 #include <vector>
+#include "gco/GCoptimization.h"
 
 #define SPARSENESS 4
 #define MAX_ITERATIONS 100
 
+int smoothFn_anydir( int p1, int p2, int l1, int l2, void* matrix_term );
+
+typedef Eigen::Vector2d Point;
 namespace ssdr_ns
 {
 
@@ -61,13 +65,21 @@ class ssdr {
                                      std::vector<Eigen::Vector2d>* Ts );
 
     int find_closest_point( const Point& p , const std::vector<Point>& points , double* dist );
-
+    
+    int* combine_data_terms( int* data, int* data_reverse, int num_points, int num_labels );
     int* set_data_term( const std::vector<Point>& pose_1,
                               const std::vector<Point>& pose_2,
                               const std::vector<Eigen::Matrix2d>& Rs,
                               const std::vector<Eigen::Vector2d>& Ts );
 
     int* set_smoothness_term( int num_labels );
+
+    std::vector<std::vector<int>> bidirectional_correspondance( const std::vector<Point>& pose_1,
+                                                                const std::vector<Point>& pose_2,
+                                                                const std::vector<Eigen::Matrix2d>& Rs,
+                                                                const std::vector<Eigen::Vector2d>& Ts,
+                                                                const std::vector<int>& label_assignment,
+                                                                const std::vector<int>& label_assignment_2 );
 
     Eigen::MatrixXd set_curve_neighborhood( const std::vector<Eigen::Vector4i>& pose_curves );
 
@@ -77,6 +89,10 @@ class ssdr {
                                     int ***neighborsIndexes, 
                                     int*** neighborsWeights );
 
+    void combine_neighborhood_info( int** numNeighbors, int*** neighborsIndexes, int*** neighborsWeights,
+                                    int* numNeighbors_dfp, int** neighborsIndexes_dfp, int** neighborsWeights_dfp,
+                                    const std::vector<std::vector<int>>& nbh_temp, int num_points );
+
     std::vector<int> assign_labels( int num_points,
                                     int num_labels,
                                     int *data_terms,
@@ -85,6 +101,14 @@ class ssdr {
                                     int **neighborsIndexes, 
                                     int** neighborsWeights );
 
+    std::vector<int> assign_labels_2( int num_points,
+                                      int num_labels,
+                                      int *data_terms,
+                                      GCoptimization::SmoothCostFnExtra fn,
+                                      void* smooth_M,
+                                      int *numNeighbors, 
+                                      int **neighborsIndexes, 
+                                      int** neighborsWeights );
 
     void set_restpose_clusters( const std::vector<int>& label_assignment,
                                 const int num_points,
@@ -113,8 +137,38 @@ class ssdr {
 
     void output_svg( const std::vector<Point>& pose_1_samples, 
                      const std::vector<Point>& pose_2_samples, 
+                     const std::vector<Point>& pose_2_samples_B, 
                      const std::vector<std::vector<int>>& pose_1_clusters,
-                     const std::vector<std::vector<int>>& pose_2_clusters );
+                     const std::vector<std::vector<int>>& pose_2_clusters,
+                     char const *file_name,
+                     int index );
+
+    Point calculate_scaling_factor( const std::vector<Point>& point_coordinates );
+
+    std::vector<Point> scale_samples( const std::vector<Point>& point_coordinates, 
+                                      const Point& scale_factors );
+
+    void set_nb_local(std::vector<std::vector<int>>& nb_local,
+						std::vector<std::vector<double>>& nb_local_d,
+						const std::vector<Point>& end_points,
+						const std::vector<int>& p_curves,
+						const Eigen::MatrixXd& p_neighbor_curves,
+						double max_diagnal );
+
+
+   void compute_neighborhood_info_2( const std::vector<std::vector<int>>& nbh_inf,
+									  const std::vector<std::vector<double>>& nbh_d,
+									  int **numNeighbors,
+									  int ***neighborsIndexes,
+									  int*** neighborsWeights,
+									  double max_diagnal);
+
+    void combine_neighborhood_info_2( int** numNeighbors, int*** neighborsIndexes, int*** neighborsWeights,
+                                      int* numNeighbors_dfp, int** neighborsIndexes_dfp, int** neighborsWeights_dfp,
+                                      const std::vector<std::vector<int>>& nbh_temp, int num_points );
+
+    int smoothFn_unidirectional( int p1, int p2, int l1, int l2 );
+    int smoothFn_bidirectional( int p1, int p2, int l1, int l2 );
 
     /*    Rest Pose    */
     // is set by svg parser to hold the end points of the curves
@@ -146,6 +200,14 @@ class ssdr {
 
     int num_handles;
 
+    /*    Global Terms for Calculating Smoothness     */
+
+    std::vector<Eigen::Matrix2d> global_Rs;
+    std::vector<Eigen::Vector2d> global_Ts;
+    std::vector<Eigen::Matrix2d> global_Rs_2;
+    std::vector<Eigen::Vector2d> global_Ts_2;
+    std::vector<Point> global_SamplePoints;
+    int global_num_points;
 
 };
 
