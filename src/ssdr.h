@@ -142,6 +142,11 @@ class ssdr {
                      const std::vector<std::vector<int>>& pose_2_clusters,
                      char const *file_name,
                      int index );
+    void output_svg_2( const std::vector<Point>& pose_1_samples, 
+                         const std::vector<Point>& pose_2_samples,
+                         const std::vector<Point>& pose_2_samples_B, 
+                         char const *file_name,
+                         int index );
 
     Point calculate_scaling_factor( const std::vector<Point>& point_coordinates );
 

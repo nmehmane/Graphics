@@ -20,6 +20,10 @@ include_directories(${GSL_INCLUDE_DIRS})
 find_package(Cairo)
 include_directories(${CAIRO_INCLUDE_DIRS})
 
+find_package(osqp REQUIRED)
+
+find_package(OsqpEigen REQUIRED)
+
 ## GCO
 set(gco_srcs
     external/gco/GCoptimization.cpp
@@ -52,6 +56,8 @@ MESSAGE("
 *   Boost  
 *   SVG++ : header only/ headers included in the project
 *   Cairo
+*   OSQP
+*   OSQP-Eigen
 *****************************************************************************
 ")
 
@@ -61,7 +67,9 @@ INCLUDE_DIRECTORIES(src)
 AUX_SOURCE_DIRECTORY(src SRC_FILES)
 
 ADD_EXECUTABLE(svg_parser ${SRC_FILES})
-TARGET_LINK_LIBRARIES(svg_parser Eigen3::Eigen)
+target_link_libraries(svg_parser Eigen3::Eigen)
 target_link_libraries(svg_parser gco)
 target_link_libraries(svg_parser gems)
+target_link_libraries(svg_parser osqp::osqp)
 target_link_libraries(svg_parser ${CAIRO_LIBRARIES})
+target_link_libraries(svg_parser OsqpEigen::OsqpEigen)

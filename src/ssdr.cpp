@@ -253,7 +253,7 @@ void ssdr::perform_ssdr()
                 printf("\n");
             } 
 */
-    //    int *smooth = set_smoothness_term( Rs.size() );
+        int *smooth = set_smoothness_term( Rs.size() );
 
         int *numNeighbors_rp;
         int **neighborsIndexes_rp;
@@ -331,7 +331,7 @@ void ssdr::perform_ssdr()
         std::vector<int> label_assign_forward;
         std::vector<int> label_assign_reverse;
 
-   /*     label_assign_forward = assign_labels( num_points, num_labels,
+        label_assign_forward = assign_labels( num_points, num_labels,
                                               data_forward, smooth,
                                               numNeighbors_rp,
                                               neighborsIndexes_rp, 
@@ -342,8 +342,8 @@ void ssdr::perform_ssdr()
                                               numNeighbors_dfp, 
                                               neighborsIndexes_dfp, 
                                               neighborsWeights_dfp );
-     */  
-
+       
+/*
         std::vector<std::vector<Point>> smooth_matrix_forward;
         std::vector<std::vector<Point>> smooth_matrix_reverse;
         std::vector<std::vector<Point>> smooth_matrix_bidir;
@@ -379,13 +379,13 @@ void ssdr::perform_ssdr()
            smooth_matrix_bidir.push_back(temp_v_2);
 
        }
-      
+  */    
       /*  global_Rs = Rs;
         global_Ts = Ts;
         global_SamplePoints = rp_SamplePoints; 
 */
        // int (ssdr::*fn)(int, int, int, int) = &ssdr::smoothFn_unidirectional;
-        label_assign_forward = assign_labels_2( num_points, num_labels,
+/*        label_assign_forward = assign_labels_2( num_points, num_labels,
                                                 data_forward, &::smoothFn_anydir_2,
                                                 static_cast<void *>(&smooth_matrix_forward),
                                                 numNeighbors_rp,
@@ -405,7 +405,7 @@ void ssdr::perform_ssdr()
         global_Rs = Rs;
         global_Ts = Ts;
         global_Rs_2 = Rs_inv;
-        global_Ts_2 = Ts_neg;
+        global_Ts_2 = Ts_neg; */
  /*       printf("\nlabel assignment\n");
         for( int l : label_assign_forward )
         {
@@ -490,18 +490,18 @@ void ssdr::perform_ssdr()
         }
       
 */
-     /*   label_assignment = assign_labels( 2*num_points, num_labels, 
+        label_assignment = assign_labels( 2*num_points, num_labels, 
                                           data_terms, smooth,
                                           numNeighbors_rp, 
                                           neighborsIndexes_rp, 
                                           neighborsWeights_rp );
-       */ 
-        label_assignment = assign_labels_2( 2*num_points, num_labels, 
+        
+       /* label_assignment = assign_labels_2( 2*num_points, num_labels, 
                                             data_terms, &::smoothFn_anydir_2,
                                             static_cast<void *>(&smooth_matrix_bidir),
                                             numNeighbors_rp, 
                                             neighborsIndexes_rp, 
-                                            neighborsWeights_rp );
+                                            neighborsWeights_rp );*/
         // having computed the bidirectional label assignment
         // the clusters are derived
         
@@ -686,7 +686,7 @@ void ssdr::perform_ssdr()
         }
         
     }while( (++iter) < 5 );
-    
+    std::vector<Point> trans_points_final;
     //solver logic
     // now having the clusters in the rest pose and the corresponding clusters
     // in deformed pose for each pair we solve for the weights
@@ -698,9 +698,15 @@ void ssdr::perform_ssdr()
             int index2 = pose_2_clusters.at(i).at(j);
             Point p_i = rp_SamplePoints.at(index1);
             Point v_i = dfp_SamplePoints.at(index2);
-            QPSolve_i( Rs, Ts, p_i, v_i );
+            auto solution_w = QPSolve_i( Rs, Ts, p_i, v_i );
+            trans_points_final.push_back( solution_w );
+            std::cout << " ################################\n" << solution_w << std::endl;
         }
     }
+        std::vector<Point> rp_SP = scale_samples( rp_SamplePoints, scaling_p );
+        std::vector<Point> dfp_SP = scale_samples( dfp_SamplePoints, scaling_p );
+        trans_points_final = scale_samples( trans_points_final, scaling_p );
+        output_svg_2( rp_SP, dfp_SP, trans_points_final, "final_result", 0  );
 
 }
 
@@ -1985,4 +1991,114 @@ void ssdr::combine_neighborhood_info_2( int** numNeighbors, int*** neighborsInde
 }
 
 /*******************************************************************************************************/
+/*******************************************************************************************************/
+
+void ssdr::output_svg_2( const std::vector<Point>& pose_1_samples, 
+                         const std::vector<Point>& pose_2_samples,
+                         const std::vector<Point>& pose_2_samples_B, 
+                         char const *file_name,
+                         int index )
+{
+    std::vector<Eigen::Vector3d> colors;
+    Eigen::Vector3d temp = Eigen::Vector3d( 0.5, 0.5, 0.5 );
+    colors.push_back( temp );
+    temp = Eigen::Vector3d( 1, 0, 0 );
+    colors.push_back( temp );
+    //colors.push_back( Eigen::Vector3d( 0.5, 0 , 0) );
+    //colors.push_back( Eigen::Vector3d( 1, 1, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0.5, 0.5, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 1, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 0.5, 0 ) );
+    colors.push_back( Eigen::Vector3d( 0, 1, 1 ) );
+    colors.push_back( Eigen::Vector3d( 0, 0, 1 ) );
+    colors.push_back( Eigen::Vector3d( 1, 0, 1 ) );
+    colors.push_back( Eigen::Vector3d( 0.5, 0, 0.5 ) );
+    
+    cairo_t *cr;
+    cairo_surface_t *surface;
+    cairo_pattern_t *pattern;
+    int x,y;
+    char buffer[24]; // make sure it's big enough
+    snprintf(buffer, sizeof(buffer), "%s_%d.svg", file_name, index);
+    
+    surface =
+      (cairo_surface_t *)cairo_svg_surface_create(buffer, 1200.0, 1200.0);
+    cr = cairo_create(surface);
+    
+    // draw the original rest pose image curves in black ( 0 , 0 , 0 )
+    
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width( cr, 5 );
+
+    Point p0, p1, p2, p3;
+    
+    for( auto & curve : rp_Curves )
+    {
+        //end points
+        p0 = rp_CurveEndPoints.at(curve[0]);
+        p3 = rp_CurveEndPoints.at(curve[3]);
+        
+        //tangent control points
+        p1 = rp_CurveMiddlePoints.at(curve[1]);
+        p2 = rp_CurveMiddlePoints.at(curve[2]);
+        
+        cairo_move_to( cr, p0(0), p0(1) );
+        cairo_curve_to( cr, p1(0), p1(1), p2(0), p2(1), p3(0), p3(1) );
+        cairo_stroke( cr );
+
+    }
+
+    // draw the original deformed pose image curves in navy ( 0 , 0 , 0.5 )
+    
+    cairo_set_source_rgb(cr, 0, 0, 0.5);
+    cairo_set_line_width( cr, 5 );
+    
+    for( auto & curve : dfp_Curves )
+    {
+        //end points
+        p0 = dfp_CurveEndPoints.at(curve[0]);
+        p3 = dfp_CurveEndPoints.at(curve[3]);
+        
+        //tangent control points
+        p1 = dfp_CurveMiddlePoints.at(curve[1]);
+        p2 = dfp_CurveMiddlePoints.at(curve[2]);
+        
+        cairo_move_to( cr, p0(0), p0(1) );
+        cairo_curve_to( cr, p1(0), p1(1), p2(0), p2(1), p3(0), p3(1) );
+        cairo_stroke( cr );
+
+    }
+    
+    //draw the deformed pose samples
+    cairo_set_source_rgb(cr, 1, 0, 1);
+    cairo_set_line_width( cr, 3 );
+    for( auto& p : pose_2_samples_B )
+    {
+        cairo_arc(cr, p(0), p(1), 10, 0, 2*M_PI);
+        cairo_stroke( cr );
+    }
+
+    //draw the rest pose samples
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width( cr, 3 );
+    for( auto& p : pose_1_samples )
+    {
+        cairo_arc(cr, p(0), p(1), 5, 0, 2*M_PI);
+        cairo_stroke( cr );
+    }
+    
+    //draw the rest pose samples
+    cairo_set_source_rgb(cr, 0, 0, 0.5);
+    cairo_set_line_width( cr, 3 );
+    for( auto& p : pose_2_samples )
+    {
+        cairo_arc(cr, p(0), p(1), 5, 0, 2*M_PI);
+        cairo_stroke( cr );
+    }
+    cairo_destroy (cr);
+    cairo_surface_destroy (surface);
+
+}
+
+/*********************************************************************************************/
 }

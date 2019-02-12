@@ -6,6 +6,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include "osqp.h"
+#include <OsqpEigen/OsqpEigen.h>
 
 
 Eigen::MatrixXd Calculate_A_i( const std::vector<Eigen::Matrix2d>& Rs, 
@@ -60,7 +62,7 @@ Eigen::MatrixXd Calculate_P( const Eigen::MatrixXd& A )
     return ( A.transpose() * A * 2 );
 }
 
-Eigen::MatrixXd Calculate_q( const Eigen::MatrixXd& A, const Eigen::Vector2d v_i )
+Eigen::VectorXd Calculate_q( const Eigen::MatrixXd& A, const Eigen::Vector2d v_i )
 {
     return ( -2 * v_i.transpose() * A ).transpose();
 }
@@ -79,16 +81,16 @@ Eigen::MatrixXd Calculate_q( const Eigen::MatrixXd& A, const Eigen::Vector2d v_i
 // [ 0 ]    [ 0  0   0   ...  1 ]        [ 1 ]
 // [ 1 ]    [ 1  1   1   ...  1 ]        [ 1 ]
 
-Eigen::MatrixXd Calculate_l( int num_labels )
+Eigen::VectorXd Calculate_l( int num_labels )
 {
-    Eigen::MatrixXd l = Eigen::MatrixXd::Zero( num_labels + 1 , 1 );
-    l(num_labels,0) = 1.0;
+    Eigen::VectorXd l = Eigen::VectorXd::Zero( num_labels + 1 );
+    l(num_labels) = 1.0;
     return l;
 }
 
-Eigen::MatrixXd Calculate_u( int num_labels )
+Eigen::VectorXd Calculate_u( int num_labels )
 {
-    Eigen::MatrixXd u = Eigen::MatrixXd::Ones( num_labels + 1 , 1 );
+    Eigen::VectorXd u = Eigen::VectorXd::Ones( num_labels + 1 );
     return u;
 }
 
@@ -105,35 +107,41 @@ Eigen::MatrixXd Calculate_B( int num_labels )
 }
 
 //std::vectorXd QPSolve_i( const std::vector<Eigen::Matrix2d>& Rs, 
-void QPSolve_i( const std::vector<Eigen::Matrix2d>& Rs, 
-                         const std::vector<Eigen::Vector2d>& Ts, 
-                         const Point& p_i, const Point& v_i )
+Eigen::VectorXd QPSolve_i( const std::vector<Eigen::Matrix2d>& Rs, 
+                           const std::vector<Eigen::Vector2d>& Ts, 
+                           const Point& p_i, const Point& v_i )
 {
     int num_labels = Rs.size();
-    Eigen::MatrixXd l = Calculate_l( num_labels );
-    Eigen::MatrixXd u = Calculate_u( num_labels );
+    Eigen::VectorXd l = Calculate_l( num_labels );
+    Eigen::VectorXd u = Calculate_u( num_labels );
     Eigen::MatrixXd B = Calculate_B( num_labels );
 
 
     Eigen::MatrixXd A = Calculate_A_i( Rs, Ts, p_i );
     Eigen::MatrixXd P = Calculate_P( A );
-    Eigen::MatrixXd q = Calculate_q( A, v_i );
+    Eigen::VectorXd q = Calculate_q( A, v_i );
 
-    std::cout << "\nSolver Stuff\nl = \n" << l << "\nu = \n" << u << "\nB = \n" << B << std::endl;
-    std::cout << "\nA = \n" << A << "\nP = \n" << P << "\nq = \n" << q << std::endl; 
+    //std::cout << "\nSolver Stuff\nl = \n" << l << "\nu = \n" << u << "\nB = \n" << B << std::endl;
+    //std::cout << "\nA = \n" << A << "\nP = \n" << P << "\nq = \n" << q << std::endl; 
+
+    Eigen::SparseMatrix<double> B_eigen_sparse = B.sparseView();     
+    Eigen::SparseMatrix<double> P_eigen_sparse = P.sparseView();     
     
-   /* int r = P.rows();
-    int c = P.cols();
-
-    c_float* P_x = (c_float*)c_malloc(sizeof(c_float) * r * c);
-    for( int i = 0 ; i < r ; i++ )
-    {
-        for( int j = 0 ; j < c ; j++ )
-        {
-            P_x[i*c + j] = P(i,j);
-        }
-    }
-    c_int P_nnz = r * c;
-    */
+    OsqpEigen::Solver solver;
+    solver.settings()->setVerbosity(false);
+    solver.data()->setNumberOfVariables(num_labels); 
+    solver.data()->setNumberOfConstraints(num_labels + 1);
+    solver.settings()->setScaling(0);
+    solver.data()->setHessianMatrix(P_eigen_sparse);
+    solver.data()->setGradient(q);
+    solver.data()->setLinearConstraintsMatrix(B_eigen_sparse);
+    solver.data()->setLowerBound(l);
+    solver.data()->setUpperBound(u);
+    solver.initSolver();
+    solver.solve();
+    auto solution = solver.getSolution();
+    std::cout << "Solution to the Weights\n" << solution << std::endl; 
+    //return solution;
+    return (A * solution);
 }
 
